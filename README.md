@@ -152,7 +152,7 @@ This is **game changing**! And for a few reasons, too!
 **Third**, _we unblock our event handlers_. What do I mean? Well, unlike Svelte, React doesn't allow you to [define multiples of the same event handler](https://svelte.dev/repl/91a053c1a3ed4aa3ac73b0b0518bf20e?version=3.29.4) on a JSX element. So once you take up a handler, that's it. Sure, you can _simulate_ defining multiple handlers at once by doing something like this:
 
 ```tsx
-MyPage() {
+function MyPage() {
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     callback1(event);
     callback2(event);
@@ -162,7 +162,7 @@ MyPage() {
     <form>
       <input onChange={handleChange} />
     </form>
-  )
+  );
 }
 ```
 
