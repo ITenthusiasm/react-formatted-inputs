@@ -1,6 +1,6 @@
 # Do You Really Need React State to Format Inputs?
 
-As I've said in another article, [it's more than possible to handle forms in React without using state](https://github.com/ITenthusiasm/react-uncontrolled-inputs). But what about formatted inputs? Let's say I have an input that's intended to take a person's phone number (or some other meaningful numeric value). You're probably used to seeing solutions that look something like this:
+As I've said in another article, [it's more than possible to handle forms in React without using state](https://medium.com/you-dont-need-all-that-react-state-in-your-forms-a2c38b8e21d5). But what about formatted inputs? Let's say I have an input that's intended to take a person's phone number (or some other meaningful numeric value). You're probably used to seeing solutions that look something like this:
 
 ```tsx
 import React, { useState } from "react";
@@ -70,11 +70,11 @@ function MyPage() {
 
 (If you're unfamiliar with the `beforeinput` event, I encourage you to check out the [MDN docs](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/beforeinput_event). But essentially, `beforeinput` gives you access to an input's value _before_ any changes have occurred. This is incredibly useful for keeping the `input`'s value valid.)
 
-This approach works. But is it really worth it? I mean... The code is more verbose... I still have to pollute 2 `input` props... and this doesn't look very re-usable. Is all of that really worth it in order to avoid unnecessary re-renders, large amounts of state variables, and the [other problems that come with controlled inputs](https://github.com/ITenthusiasm/react-uncontrolled-inputs)?
+This approach works. But is it really worth it? I mean... The code is more verbose... I still have to pollute 2 `input` props... and this doesn't look very re-usable. Is all of that really worth it in order to avoid unnecessary re-renders, large amounts of state variables, and the [other problems that come with controlled inputs](https://medium.com/you-dont-need-all-that-react-state-in-your-forms-a2c38b8e21d5)?
 
 If that's what you're thinking, then you're asking the right questions. :) Thankfully, there is a solution that beautifully resolves this concern.
 
-## React Actions
+# React Actions
 
 I've been playing around with [`Svelte`](https://svelte.dev/) for a bit recently, and I quite honestly love it. I _highly_ encourage you to try it out for yourself. One of the brilliant features that `Svelte` has is [actions](https://svelte.dev/tutorial/actions). Actions enable you to add _re-usable_ functionality to an HTML element _without_ having to create a separate component. And it's all done using plain old JS functions. I first learned about actions when [Kevin](https://twitter.com/kevmodrome) from [Svelte Society](https://sveltesociety.dev/) helped me out with a problem on formatting inputs. He has a great article on actions [here](https://svelte.school/tutorials/introduction-to-actions). But you're here for React, right?
 
@@ -85,9 +85,9 @@ I used to think that adding re-usable functionality to HTML elements was only po
 ```tsx
 // components/MyPage.tsx
 import React from "react";
-import useFormat from "actions/useFormat";
+import useFormat from "./actions/useFormat";
 
-function MyPage() {
+export default function MyPage() {
   return (
     <form>
       <input ref={useFormat(/^\d*$/)} id="some-numeric-input" type="text" />
@@ -96,9 +96,12 @@ function MyPage() {
 }
 ```
 
-```ts
+```tsx
 // actions/useFormat.ts
 function useFormat(pattern: RegExp) {
+  /** Stores the react `ref` */
+  let input: HTMLInputElement | null;
+
   /** Tracks the last valid value of the input. */
   let lastValidValue: string;
 
@@ -121,33 +124,42 @@ function useFormat(pattern: RegExp) {
     lastValidValue = value;
   }
 
-  return function (input: HTMLInputElement | null): void {
-    if (!input) return;
-
-    input.pattern = pattern.toString().slice(1, -1); // Strip the leading and ending forward slashes
-    input.addEventListener("beforeinput", handleBeforeInput as EventListener);
-    input.addEventListener("input", handleInput as EventListener);
+  return function (reactRef: typeof input): void {
+    if (reactRef !== null) {
+      input = reactRef;
+      input.pattern = pattern.toString().slice(1, -1); // Strip the leading and ending forward slashes
+      input.addEventListener("beforeinput", handleBeforeInput as EventListener);
+      input.addEventListener("input", handleInput as EventListener);
+    } else {
+      input?.removeEventListener("beforeinput", handleBeforeInput as EventListener);
+      input?.removeEventListener("input", handleInput as EventListener);
+      input = null;
+    }
   };
 }
 
 export default useFormat;
 ```
 
-I call these... **React Actions**. (Did that give you a strong reaction? :smirk:)
+I call these... **React Actions**. (Did that give you a strong reaction? 😏)
 
-Basically, I take advantage of the HTMLInputElement reference that React exposes, and I hook up all the useful handlers that I need to get the formatting job done. Because the `ref` prop that React exposes accepts a function that acts _on_ the DOM element, I'm actually able to create this re-usable utility function that you see above. I'm even able to update meaningful HTML attributes, such as [pattern](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern)!
+Basically, I take advantage of the `HTMLInputElement` reference that React exposes, and I hook up all the useful handlers that I need to get the formatting job done. Because the `ref` prop that React exposes accepts a function that acts _on_ the DOM element, I'm actually able to create this re-usable utility function that you see above. I'm even able to update meaningful HTML attributes, such as [pattern](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern)!
 
-Because the `input` reference (`ref`) can be `null` at the very start of the `input`'s life, I do need a single null check. But that isn't a big deal. Everything gets registered correctly after the `input` is properly loaded into the DOM.
+Notice that — just as with Svelte Actions — we have to take responsibility for cleaning up the event listeners in our React Actions. [According to the React docs](https://reactjs.org/docs/refs-and-the-dom.html#callback-refs):
+
+> React will call the `ref` callback with the DOM element when the component mounts, and call it with `null` when it unmounts. Refs are guaranteed to be up-to-date before `componentDidMount` or `componentDidUpdate` fires.
+
+Thus, in our function, we're making sure to _add_ the event listeners when the react reference exists (i.e., during mounting), and _remove_ the event listeners when the `reactRef` is `null` (i.e., during unmounting).
 
 Note: You probably noticed that this time I'm adding an `oninput` handler instead of an `onchange` handler to the input element. This is intentional, as _there is a difference between `oninput` handlers and `onchange` handlers in the regular JavaScript world_. See [this Stackoverflow question](https://stackoverflow.com/questions/17047497/difference-between-change-and-input-event-for-an-input-element). Most well-known frontend frameworks like Vue and Svelte respect this difference (thankfully). Unfortunately, [React does not](https://github.com/facebook/react/issues/3964). And since our function is using _raw JS_ (not React), we have to use the regular `oninput` handler instead of an `onchange` handler (which is a good thing). This article is not intended to fully explain this React oddity, but I encourage you to learn more about it soon if you aren't familiar with it. It's pretty important. (That React GitHub link I just gave you is a good start.)
 
-## What Are the Benefits to This?
+# What Are the Benefits to This?
 
 This is **game changing**! And for a few reasons, too!
 
-**First**, it means that we don't run into the issues I mentioned [in my first article about using controlled inputs](https://github.com/ITenthusiasm/react-uncontrolled-inputs). This means we reduce code redundancy, remove unnecessary re-renders, maintain code and skills that are _transferrable between frontend frameworks_, and more!
+**First**, it means that we don't run into the issues I mentioned [in my first article about using controlled inputs](https://medium.com/you-dont-need-all-that-react-state-in-your-forms-a2c38b8e21d5). This means we reduce code redundancy, remove unnecessary re-renders, maintain code and skills that are _transferrable between frontend frameworks_, and more!
 
-**Second**, we have a _re-usable_ solution to our formatting problem. Someone may say, "Couldn't we have added re-usability via components?" And the answer is yes. However, in terms of re-usability, I prefer this approach over creating a custom hook or creating a re-usable component. Regarding the former, it just seems odd to use hooks for something so simple. The latter option can get you in trouble if you want more freedom over how your inputs are styled. (Plus, if you aren't using TypeScript, then redeclaring ALL the possible HTMLInputElement attributes as props would be a huge bother.) So much for "re-usability". Also, both of those approaches are very framework specific, and they still leave you with unnecessary re-renders in one way or another. _React Actions_ remove the re-rendering problem without removing re-usability. They're the best way to go for re-usability and efficiency.
+**Second**, we have a _re-usable_ solution to our formatting problem. Someone may say, "Couldn't we have added re-usability via components?" And the answer is yes. However, in terms of re-usability, I prefer this approach over creating a custom hook or creating a re-usable component. Regarding the former, it just seems odd to use hooks for something so simple. The latter option can get you in trouble if you want more freedom over how your inputs are styled. (Plus, if you aren't using TypeScript, then redeclaring ALL the possible `HTMLInputElement` attributes as props would be a huge bother.) So much for "re-usability". Also, both of those approaches are very framework specific, and they still leave you with unnecessary re-renders in one way or another. _React Actions_ remove the re-rendering problem without removing re-usability. They're the best way to go for re-usability and efficiency.
 
 **Third**, _we unblock our event handlers_. What do I mean? Well, unlike Svelte, React doesn't allow you to [define multiples of the same event handler](https://svelte.dev/repl/91a053c1a3ed4aa3ac73b0b0518bf20e?version=3.29.4) on a JSX element. So once you take up a handler, that's it. Sure, you can _simulate_ defining multiple handlers at once by doing something like this:
 
@@ -166,15 +178,15 @@ function MyPage() {
 }
 ```
 
-But... that approach is rather bothersome -- especially when you only want to do something as simple as format an input. By using React Actions, we've _freed up that `onChange` prop_! (Admittedly, it trades the `onChange` prop for the `ref` prop. However, `ref` is much less commonly used. And if you really need to use the `ref` more than once, you can get around the problem by using a similar approach to the one showed above.)
+But that approach is rather bothersome — especially when you only want to do something as simple as format an input. By using React Actions, _we've freed up that `onChange` prop_! (Admittedly, it trades the `onChange` prop for the `ref` prop. However, `ref` is much less commonly used. And if you really need to use the `ref` more than once, you can get around the problem by using a similar approach to the one showed above.)
 
 **Fourth** this approach is compatible with state variables! Consider this:
 
 ```tsx
 import React, { useState } from "react";
-import useFormat from "actions/useFormat";
+import useFormat from "./actions/useFormat";
 
-function MyPage() {
+export default function MyPage() {
   const [value, setValue] = useState("");
 
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -195,13 +207,13 @@ function MyPage() {
 }
 ```
 
-This situation acts almost _exactly the same_ as if we were just using a regular input. The difference? Our `handleChange` event handler will _only_ see the _formatted_ value whenever the value changes. This means you can setup an event handler that's only intended to interact with the formatted value. And you can do this _without_ needing an intermediary "re-usable component".
+This situation acts almost _exactly the same_ as if we were just _controlling_ a regular input. The difference? Our `handleChange` event handler will _only_ see the _formatted_ value whenever the value changes. This means you can setup an event handler that's only intended to interact with the formatted value. And you can do this _without_ needing an intermediary "re-usable component".
 
-## "But Mutations!!!"
+# "But Mutations!!!"
 
 Since this is a React article, I imagine there are a few people who might complain about how this approach includes mutations (_not_ on state... just on `event.target`). But honestly, after playing around with some other frameworks, I've learned that there are times to mutate, and there are times not to mutate. Better to learn both and master the different situations than to impose standards impractically and make code more difficult to handle. There's a time and place for everything...
 
-## And the Possibilities Don't Stop with Inputs...
+# And the Possibilities Don't Stop with Inputs...
 
 You can create whatever kind of React Action you need to get the job done for your inputs. But you can go even further beyond! For instance, have you ever had to make HTML Elements act as if they're buttons? Please don't tell me you're still under the slavery of using "re-usable components":
 
@@ -238,16 +250,16 @@ Nope. Don't like it. It's a little lame that with the "re-usable component" appr
 We can make things _much_ simpler with React Actions:
 
 ```tsx
-import useBtnLike from "actions/btnLike";
+import React from "react";
+import useFormat from "./actions/useFormat";
+import useBtnLike from "./actions/useBtnLike";
 
-function MyPage() {
-  // ...
-
+export default function MyPage() {
   return (
     <form>
-      {/* ... */}
+      <input ref={useFormat(/^\d*$/)} id="some-numeric-input" type="text" />
 
-      <label ref={useBtnLike} htmlFor="file-upload">
+      <label ref={useBtnLike()} htmlFor="file-upload">
         Upload File
       </label>
       <input id="file-upload" type="file" style={{ display: "none" }} />
@@ -256,7 +268,7 @@ function MyPage() {
 }
 ```
 
-```ts
+```tsx
 // actions/useBtnLike.ts
 
 // Place this on the outside so that we don't have to define it every time an element mounts
@@ -268,12 +280,19 @@ function handleKeydown(event: KeyboardEvent & { currentTarget: HTMLElement }): v
 }
 
 /** Makes an element focusable and enables it to receive `keydown` events as if it were a `button`. */
-function useBtnLike(element: HTMLElement | null): void {
-  // Null check
-  if (!element) return;
+function useBtnLike() {
+  let element: HTMLElement | null;
 
-  element.tabIndex = 0;
-  element.addEventListener("keydown", handleKeydown as EventListener);
+  return function (reactRef: typeof element): void {
+    if (reactRef !== null) {
+      element = reactRef;
+      element.tabIndex = 0;
+      element.addEventListener("keydown", handleKeydown as EventListener);
+    } else {
+      element?.removeEventListener("keydown", handleKeydown as EventListener);
+      element = null;
+    }
+  };
 }
 
 export default useBtnLike;
@@ -283,7 +302,7 @@ By adding a JSDoc comment, we can add some IntelliSense to our React Action so t
 
 This is only the beginning! I encourage everyone who reads this article to explore the new possibilities for their React applications with this approach!
 
-## Don't Forget Your Tests!
+# Don't Forget Your Tests!
 
 Before wrapping up, I just wanted to make sure it was clear that actions _are_ testable too!
 
@@ -297,14 +316,14 @@ import userEvent from "@testing-library/user-event";
 import useBtnLike from "../useBtnLike";
 
 describe("Use Button-Like Action", () => {
-  it("Causes an element to behave like a button for keyboard events", () => {
+  it("Causes an element to behave like a button for keyboard events", async () => {
     const handleClick = jest.fn((event: React.MouseEvent<HTMLLabelElement, MouseEvent>) => {
       console.log("In a real app, the file navigator would be opened.");
     });
 
     const { getByText } = render(
       <form>
-        <label ref={useBtnLike} htmlFor="file-upload" onClick={handleClick}>
+        <label ref={useBtnLike()} htmlFor="file-upload" onClick={handleClick}>
           Upload File
         </label>
         <input id="file-upload" type="file" style={{ display: "none" }} />
@@ -313,11 +332,11 @@ describe("Use Button-Like Action", () => {
 
     // Shift focus to label element, and activate it with keyboard actions
     const label = getByText(/upload file/i);
-    userEvent.tab(); // Proves the element is focusable
-    userEvent.keyboard("{Enter}");
+    await userEvent.tab(); // Proves the element is focusable
+    await userEvent.keyboard("{Enter}");
     expect(handleClick).toHaveBeenCalledTimes(1);
 
-    userEvent.keyboard(" ");
+    await userEvent.keyboard(" ");
     expect(handleClick).toHaveBeenCalledTimes(2);
   });
 });
@@ -355,14 +374,14 @@ describe("Use Format Action", () => {
 });
 ```
 
-(If you're following along with these examples in the codesandbox, please note that the test for `useBtnLike` uses v13 of `userEvent`, whereas the test for `useFormat` uses v14. If you're using v14 for both tests, remember to `await` all of your calls to the `userEvent` functions.)
+(Please note that the latest beta version of `userEvent` is being used for these tests. At the time of this writing, that would be `@testing-library/user-event@14.0.0-beta.11`. When you're using v14 for your tests, remember to `await` all of your calls to the `userEvent` functions.)
 
-Yep. Pretty straightforward. Note that -- as is the case for all kinds of testing -- your testing capabilities are limited to your testing tools. For instance, as noted above, version 14 of [User Event Testing Library](https://testing-library.com/docs/user-event/intro) is needed to support tests for anything that relies on `beforeinput`. If you're determined to use an earlier version of the package, you'll have to run with [Cypress Testing Library](https://testing-library.com/docs/cypress-testing-library/intro/) to handle these kinds of edge cases.
+Yep. Pretty straightforward. Note that — as is the case for all kinds of testing — your testing capabilities are limited to your testing tools. For instance, as noted above, version 14 of [User Event Testing Library](https://testing-library.com/docs/user-event/intro) is needed to support tests for anything that relies on `beforeinput`. If you're determined to use an earlier version of the package, you'll have to run with [Cypress Testing Library](https://testing-library.com/docs/cypress-testing-library/intro/).
 
----
-
-And that's a wrap! Hope this was helpful! Let me know with a clap or a [shoutout on Twitter](https://twitter.com/ITEnthusiasm) maybe? :smile:
+And that's a wrap! Hope this was helpful! Let me know with a clap or a [shoutout on Twitter](https://twitter.com/ITEnthusiasm) maybe? 😄
 
 I want to give a **_HUUUUUUUUUUGE_** thanks to Svelte! That is, to everyone who works so hard on that project! It really is a great framework worth checking out if you haven't done so already. I _definitely_ would not have discovered this technique if it wasn't for them. And I want to give a special second shoutout to [@kevmodrome](https://twitter.com/kevmodrome) again for the help I mentioned earlier.
 
-Finally, I want to extend another big thanks to my current employer (at the time of this writing), [MojoTech](https://www.mojotech.com/). ("Hi Mom!") Something unique about MojoTech is that they give their engineers time each week to explore new things in the software world and expand their skills. Typically, I learn _most_ and _fastest_ on side projects (when it comes to software, at least). If it wasn't for them, I probably wouldn't have been able to explore Svelte, which means I wouldn't have fallen in love with the framework and learned about actions, which means this article never would have existed. :weary:
+I want to extend another **enormous** thanks to [@willwill96](https://github.com/willwill96)! He caught an implementation bug in the earlier version of this article. 😬
+
+Finally, I want to extend another big thanks to my current employer (at the time of this writing), [MojoTech](https://www.mojotech.com/). ("Hi Mom!") Something unique about MojoTech is that they give their engineers time each week to explore new things in the software world and expand their skills. Typically, I learn _most_ and _fastest_ on side projects (when it comes to software, at least). If it wasn't for them, I probably wouldn't have been able to explore Svelte, which means I wouldn't have fallen in love with the framework and learned about actions, which means this article never would have existed. 😩
