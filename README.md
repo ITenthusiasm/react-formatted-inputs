@@ -5,7 +5,7 @@ As I've said in another article, [it's more than possible to handle forms in Rea
 ```tsx
 import React, { useState } from "react";
 
-function MyPage() {
+export default function MyPage() {
   const [myNumericValue, setMyNumericValue] = useState("");
 
   function handleChange(event: Event & React.ChangeEvent<HTMLInputElement>) {
@@ -28,7 +28,7 @@ Okay... This works... But this brings us back to the problem of _needing_ state 
 ```tsx
 import React from "react";
 
-function MyPage() {
+export default function MyPage() {
   /** Tracks the last valid value of the input. */
   let lastValidValue: string;
 
@@ -166,7 +166,7 @@ This is **game changing**! And for a few reasons, too!
 **Third**, _we unblock our event handlers_. What do I mean? Well, unlike Svelte, React doesn't allow you to [define multiples of the same event handler](https://svelte.dev/repl/91a053c1a3ed4aa3ac73b0b0518bf20e?version=3.29.4) on a JSX element. So once you take up a handler, that's it. Sure, you can _simulate_ defining multiple handlers at once by doing something like this:
 
 ```tsx
-function MyPage() {
+export default function MyPage() {
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     callback1(event);
     callback2(event);
