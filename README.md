@@ -72,7 +72,7 @@ export default function MyPage() {
 
 This approach works. But is it really worth it? I mean... The code is more verbose... I still have to pollute 2 `input` props... and this doesn't look very re-usable. Is all of that really worth it in order to avoid unnecessary re-renders, large amounts of state variables, and the [other problems that come with controlled inputs](https://thomason-isaiah.medium.com/you-dont-need-all-that-react-state-in-your-forms-a2c38b8e21d5)?
 
-If that's what you're thinking, then you're asking the right questions. :) Thankfully, there is a solution that beautifully resolves this concern.
+If that's what you're thinking, then you're asking the right questions. :&rpar; Thankfully, there is a solution that beautifully resolves this concern.
 
 # React Actions
 
@@ -143,17 +143,15 @@ function actFormatted(pattern: RegExp) {
 export default actFormatted;
 ```
 
-I call these... **React Actions**. (Did that give you a strong reaction? 😏)
+I call these... **React Actions**. (Pretty cool, right?!?)
 
-Basically, I take advantage of the `HTMLInputElement` reference that React exposes, and I hook up all the useful handlers that I need to get the formatting job done. Because the `ref` prop that React exposes accepts a function that acts _on_ the DOM element, I'm able to create the re-usable utility function that you see above. I'm even able to update meaningful HTML attributes, such as [pattern](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern)!
+Basically, I take advantage of the `HTMLInputElement` reference that React exposes, and I hook up all of the useful handlers that I need to get the formatting job done. Because the `ref` prop that React exposes accepts a function that acts _on_ the DOM element, I'm able to create the re-usable utility function that you see above. I'm even able to update meaningful HTML attributes, like [`pattern`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern)!
 
-Notice that — just as with Svelte Actions — we have to take responsibility for cleaning up the event listeners in our React Actions. [According to the React docs](https://reactjs.org/docs/refs-and-the-dom.html#callback-refs):
+Notice that — just as with Svelte Actions — we have to take responsibility for cleaning up the event listeners in our React Actions. [According to the React docs](https://react.dev/reference/react-dom/components/common#ref-callback), React will call the `ref` callback with the `HTMLElement` when it's attached to the DOM. When the element is removed from the DOM, the callback will be called with `null` instead. Thus, in our function, we're making sure to _add_ the event listeners when the React reference exists (i.e., during mounting), and _remove_ the event listeners when the `reactRef` is `null` (i.e., during unmounting).
 
-> React will call the `ref` callback with the DOM element when the component mounts, and call it with `null` when it unmounts. Refs are guaranteed to be up-to-date before `componentDidMount` or `componentDidUpdate` fires.
+**Important:** React will _also_ call your `ref` callback whenever you pass a _different_ `ref` callback to an element or component -- not just during DOM attachment/removal. This means that if you're using a React Action in a component that re-renders, you _might_ need to memoize it with [`useMemo`](https://react.dev/reference/react/useMemo)/[`useCallback`](https://react.dev/reference/react/useCallback). (This will not always be required.)
 
-Thus, in our function, we're making sure to _add_ the event listeners when the react reference exists (i.e., during mounting), and _remove_ the event listeners when the `reactRef` is `null` (i.e., during unmounting).
-
-Note: You probably noticed that this time I'm adding an `oninput` handler instead of an `onchange` handler to the input element. This is intentional, as _there is a difference between `oninput` handlers and `onchange` handlers in the regular JavaScript world_. See [this Stackoverflow question](https://stackoverflow.com/questions/17047497/difference-between-change-and-input-event-for-an-input-element). Most well-known frontend frameworks like Vue and Svelte respect this difference (thankfully). Unfortunately, [React does not](https://github.com/facebook/react/issues/3964). And since our function is using _raw JS_ (not React), we have to use the regular `oninput` handler instead of an `onchange` handler (which is a good thing). This article is not intended to fully explain this React oddity, but I encourage you to learn more about it soon if you aren't familiar with it. It's pretty important. (That React GitHub link I just gave you is a good start.)
+Sidenote: You probably noticed that this time I'm adding an `oninput` handler instead of an `onchange` handler to the input element. This is intentional, as _there is a difference between `oninput` handlers and `onchange` handlers in the regular JavaScript world_. (See [this Stackoverflow question](https://stackoverflow.com/questions/17047497/difference-between-change-and-input-event-for-an-input-element).) Most well-known frontend frameworks like Vue and Svelte respect this difference (thankfully). Unfortunately, [React does not](https://github.com/facebook/react/issues/3964). And since our function is using _raw JS_ (not React), we have to use the regular `oninput` handler instead of an `onchange` handler (which is a good thing). This article is not intended to fully explain this React oddity, but I encourage you to learn more about it soon if you aren't familiar with it. It's pretty important. (That React GitHub link I just gave you is a good start.)
 
 # What Are the Benefits to This?
 
@@ -161,7 +159,7 @@ This is **game changing**! And for a few reasons, too!
 
 **First**, it means that we don't run into the issues I mentioned [in my first article about using controlled inputs](https://thomason-isaiah.medium.com/you-dont-need-all-that-react-state-in-your-forms-a2c38b8e21d5). This means we reduce code redundancy, remove unnecessary re-renders, maintain code and skills that are _transferrable between frontend frameworks_, and more!
 
-**Second**, we have a _re-usable_ solution to our formatting problem. Someone may say, "Couldn't we have added re-usability via hooks or components?" And the answer is yes. However, in terms of re-usability, I prefer this approach over creating a custom hook or creating a re-usable component. Regarding the former, it just seems odd to use hooks for something so simple. The latter option can get you in trouble if you want more freedom over how your inputs are styled. (Plus, if you aren't using TypeScript, then redeclaring ALL the possible `HTMLInputElement` attributes as props would be a huge bother.) So much for "re-usability". Also, both of those approaches are very framework specific, and they still leave you with unnecessary re-renders in one way or another. _React Actions_ remove the re-rendering problem without removing re-usability. They're the best way to go for re-usability and efficiency.
+**Second**, we have a _re-usable_ solution to our formatting problem. Someone may say, "Couldn't we have added re-usability via hooks or components?" And the answer is yes. However, in terms of re-usability, I prefer this approach over creating a custom hook or creating a re-usable component. Regarding the former, React Actions are more flexible because they aren't bound by the [Rules of Hooks](https://legacy.reactjs.org/docs/hooks-rules.html). The latter option can get you in trouble if you want more freedom over how your inputs are styled. (Plus, if you aren't using TypeScript, then redeclaring ALL the possible `HTMLInputElement` attributes as props would be a huge bother. So much for "re-usability"). Also, both of those approaches are more framework specific. _React Actions_ remove the re-rendering problem without removing re-usability. They're the best way to go for re-usability and efficiency.
 
 **Third**, _we unblock our event handlers_. What do I mean? Well, unlike Svelte, React doesn't allow you to [define multiples of the same event handler](https://svelte.dev/repl/91a053c1a3ed4aa3ac73b0b0518bf20e?version=3.29.4) on a JSX element. So once you take up a handler, that's it. Sure, you can _simulate_ defining multiple handlers at once by doing something like this:
 
@@ -209,15 +207,15 @@ export default function MyPage() {
 }
 ```
 
-This situation acts almost _exactly the same_ as if we were just _controlling_ a regular input. The difference? Our `handleChange` event handler will _only see the formatted value_ whenever the value changes. This means you can setup an event handler that's only intended to interact with the formatted value. And you can do this _without_ creating an intermediary "re-usable component".
+This situation acts almost _exactly the same_ as if we were just _controlling_ a regular input. The difference? Our `handleChange` event handler will _only see the formatted value_ whenever the value changes. This means you can setup an event handler that's only intended to interact with the formatted value. And you can do this _without_ creating an intermediate "re-usable component".
 
 # "But Mutations!!!"
 
-Since this is a React article, I imagine there are a few people who might complain about how this approach includes mutations (_not_ on state... just on `event.target`). But honestly, after playing around with some other frameworks, I've learned that there are times to mutate, and there are times not to mutate. Better to learn both and master the different scenarios than to impose standards impractically and make code more difficult to handle. There's a time and place for everything...
+Since this is a React article, I imagine there are a few people who might complain about how this approach includes mutations (_not_ on state... just on `event.target`). But honestly, after playing around with some other frameworks, I've learned that there are times to mutate, and there are times not to mutate. It's better to learn both and to master the different scenarios than it is to impose standards impractically and make code more difficult to handle. There's a time and place for everything...
 
 # And the Possibilities Don't Stop with Inputs...
 
-You can create whatever kind of React Action you need to get the job done for your inputs. But you can go even further beyond! For instance, have you ever had to make HTML Elements act as if they're buttons? Please don't tell me you're still under the slavery of using "re-usable components":
+You can create whatever kind of React Action you need to get the job done for your inputs. But you can go even further beyond! For instance, have you ever had to make HTMLElements act like buttons? If you've tried to do this with components, you've probably had to write something painful like this:
 
 ```tsx
 interface ButtonLikeProps<T extends keyof HTMLElementTagNameMap>
@@ -247,7 +245,7 @@ function ButtonLike<T extends keyof HTMLElementTagNameMap>({
 }
 ```
 
-Nope. Don't like it. It's a little lame that with the "re-usable component" approach, we're forced to create a prop that represents the type of element to use (whether we default its value or not). I also found that making a clean, re-usable, flexible TS interface was difficult to do without running into problems, hence the one disugsting use of `any`. (There might be a solution that works without `any`, but it wasn't worth excavating for. Try tinkering with the types and you'll see what I mean.)
+What's undesirable with this "re-usable component" approach is that we're forced to create a prop that represents the type of element to use (whether we default its value or not). I also found that making a clean, re-usable, flexible TS interface was difficult to do without running into problems — hence the use of `any`. (There might be a solution that works without `any`, but it wasn't worth excavating for. Try tinkering with the types and you'll see what I mean.)
 
 We can make things _much_ simpler with React Actions:
 
@@ -300,7 +298,7 @@ function actBtnLike() {
 export default actBtnLike;
 ```
 
-By adding a JSDoc comment, we can add some IntelliSense to our React Action so that new developers know what this guy is doing! And by placing `handleKeydown` on the outside of our action, we guarantee that the function is only defined once. (This will not always be possible, depending on how complex your React Action is. But this is still much better than having to create an _unnecessary_ component that could potentially perform _unnecessary_ re-renders.)
+By adding a JSDoc comment, we can add some IntelliSense to our React Action so that new developers know what this tool is doing! And by placing `handleKeydown` on the outside of our action, we guarantee that the function is only defined once. (This will not always be possible, depending on how complex your React Action is. But this is still much better than having to create an _unnecessary_ component that could potentially cause _unnecessary_ re-renders.)
 
 This is only the beginning! I encourage everyone who reads this article to explore the new possibilities for their React applications with this approach!
 
@@ -378,7 +376,7 @@ Yep. Pretty straightforward. Note that — as is the case for all kinds of testi
 
 And that's a wrap! Hope this was helpful! Let me know with a [shoutout on Twitter](https://twitter.com/ITEnthusiasm) maybe? 😄
 
-I want to give a **_HUUUUUUUUUUGE_** thanks to Svelte! That is, to everyone who works so hard on that project! It really is a great framework worth checking out if you haven't done so already. I _definitely_ would not have discovered this technique if it wasn't for them. And I want to give a special, specific shoutout to [@kevmodrome](https://twitter.com/kevmodrome) from [Svelte Society](https://sveltesociety.dev/). He helped me out with a problem related to formatting inputs in Svelte land. He has a [great article on actions](https://svelte.school/tutorials/introduction-to-actions) if you're interested in learning more about what you can do with them. It's technically for Svelte, but you can still apply what's there to "React Actions". :)
+I want to give a **_HUUUUUUUUUUGE_** thanks to Svelte! That is, to everyone who works so hard on that project! It really is a great framework worth checking out if you haven't done so already. I _definitely_ would not have discovered this technique if it wasn't for them. And I want to give a special, specific shoutout to [@kevmodrome](https://twitter.com/kevmodrome) from [Svelte Society](https://sveltesociety.dev/). He helped me out with a problem related to formatting inputs in Svelte land. He has a [great article on actions](https://svelte.school/tutorials/introduction-to-actions) if you're interested in learning more about what you can do with them. It's technically for Svelte, but you can still apply what's there to "React Actions". :&rpar;
 
 I want to extend another **enormous** thanks to [@willwill96](https://github.com/willwill96)! He caught an implementation bug in an earlier version of this article. 😬
 
